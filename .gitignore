@@ -1,0 +1,15 @@
+# Ignore .DS_Store files created by macOS Finder
+.DS_Store
+
+# Ignore Python bytecode files
+__pycache__/
+*.pyc
+
+# Ignore temporary files created by text editors
+*.swp
+*~
+
+# Ignore system files and directories
+.DS_Store
+Thumbs.db
+
