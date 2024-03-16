@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+# argv[1] = clustered .clstr file
+# argv[2] = clustered .fasta file
+# argv[3] = output .txt file
+
 from Bio import SeqIO
 import sys
 
