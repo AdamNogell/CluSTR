@@ -15,5 +15,5 @@ adapters_regions.txt ($4) needs to be in format:
 
 	5'Adapter
 	3'Adapter
- 	Start position of region of interest
-  	End position of region of interest
+ 	Start position of the region of interest
+  	End position of the region of interest
