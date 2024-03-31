@@ -7,20 +7,17 @@
 # $5 = reference_genome.fasta
 
 
-#CREATING NEEDED DIRECTORIES AND FILES
-mkdir split
-mkdir top
-mkdir mapping
-mkdir clustering
-touch report.txt
-touch log.txt
-touch clustering/log_c96_n10.txt
-touch clustering/extracted_c96_n10.fasta
+#CREATING NEEDED DIRECTORIES, FILES AND VARIABLES
+mkdir split top mapping clustering region_cut
+touch report.txt log.txt clustering/log_c96_n10.txt clustering/extracted_c96_n10.fasta region.bed
 rv_primer=$( cut -f 2 "$3" | sed -n '2p')
 adapter_5=$(sed -n '1p' "$4")
 adapter_3=$(sed -n '2p' "$4")
 start_pos=$(sed -n '3p' "$4")
+declare -i x="$start_pos"
+region_pos=$((x - 1))
 end_pos=$(sed -n '4p' "$4")
+printf "U13369.1\t0\t%d\nU13369.1\t%d\t43999" "$region_pos" "$end_pos" > region.bed
 echo "Number of reads" >> report.txt
 
 #UNZIPPING READS
@@ -70,12 +67,7 @@ echo -n "RV reads total: " >> report.txt &&
     awk '{print int($1/4)}' >> report.txt
 
 #removing unnecessary files
-rm input1.fastq
-rm input2.fastq
-rm split/file_1_trimmed-FW.fastq
-rm split/file_1_trimmed-RV.fastq
-rm split/file_2_trimmed-FW.fastq
-rm split/file_2_trimmed-RV.fastq
+rm input1.fastq input2.fastq split/file_1_trimmed-FW.fastq split/file_1_trimmed-RV.fastq split/file_2_trimmed-FW.fastq split/file_2_trimmed-RV.fastq
 
 #FASTQC - UNHASH IF NEEDED
 #fastqc FWreads.fastq
@@ -105,7 +97,7 @@ samtools view -b -o mapping/RV_region_sorted.bam mapping/RVreads_sorted.bam U133
     samtools index mapping/RV_region_sorted.bam
 
 #FILTERING
-#filtering all reads that were clipped from the left side and pass through the whole Q2
+#filtering reads that were clipped from the left side and and pass throught the whole region of interest (FURTHER PROCESSING REQIRED)
 samtools view -H mapping/RVreads_sorted.bam > header1.sam && 
     samtools view mapping/RVreads_sorted.bam | 
     awk -v start="$start_pos" -v end="$end_pos" '{if ($4 <= start && $4 + length($10) >= end && $6 ~ /^[0-9]+S/) {split($6, arr, "S"); if ($4 <= start && ($4 + length($10) - arr[1]) >= end) print}}' | 
@@ -113,7 +105,7 @@ samtools view -H mapping/RVreads_sorted.bam > header1.sam &&
     samtools view -b > filtered1.bam && 
         rm header1.sam
 
-#filtering all reads that were not clipped from the left side and pass through the whole Q2
+#filtering reads that were not clipped from the left side (READY FOR MERGING)
 samtools view -H mapping/RVreads_sorted.bam > header2.sam && 
     samtools view mapping/RVreads_sorted.bam | 
     awk -v start="$start_pos" -v end="$end_pos" '{if ($4 <= start && $4 + length($10) >= end && $6 !~ /^[0-9]+S/) print}' | 
@@ -121,16 +113,63 @@ samtools view -H mapping/RVreads_sorted.bam > header2.sam &&
     samtools view -b > filtered2.bam && 
         rm header2.sam
 
-#merging all reads that pass through Q2 and indexe the merged bam file
-samtools merge mapping/filtered.bam filtered1.bam filtered2.bam && 
+#filtering reads that were not clipped from the right side (READY FOR MERGING)
+samtools view -H filtered1.bam > header1.sam && 
+    samtools view filtered1.bam | 
+    awk '{if ($6 !~ /S$/) print}' | 
+    cat header1.sam - | 
+    samtools view -b > filtered3.bam && 
+        rm header1.sam
+
+#filtering reads that were clipped from the right side (FURTHER PROCESSING REQUIRED)
+samtools view -H filtered1.bam > header1.sam && 
+    samtools view filtered1.bam | 
+    awk '{if ($6 ~ /S$/) print}' | 
+    cat header1.sam - | 
+    samtools view -b > filtered4.bam && 
+        rm header1.sam
+
+#filtering reads that contains deletion (FURTHER PROCESSING REQUIRED)
+samtools view -H filtered4.bam > header1.sam && 
+    samtools view filtered4.bam | 
+    awk '{if ($6 ~ /D/) print}' | 
+    cat header1.sam - | 
+    samtools view -b > filtered5.bam && 
+        rm header1.sam
+
+#filtering reads that do not contain deletion (READY FOR MERGING)
+samtools view -H filtered4.bam > header1.sam && 
+    samtools view filtered4.bam | 
+    awk '{if ($6 !~ /D/) print}' | 
+    cat header1.sam - | 
+    samtools view -b > filtered6.bam && 
+        rm header1.sam
+
+#filtering reads 5 that passed through the whole region of interest (READY FOR MERGING)
+samtools view -H filtered5.bam > header1.sam && 
+    samtools view filtered5.bam | 
+    awk -v start="$start_pos" -v end="$end_pos" '{split($6, arr, "S"); split(arr[2], ar, "M"); if ($4 <= start && ($4 + length($10) - arr[1] - ar[3]) >= end) print}' | 
+    cat header1.sam - | 
+    samtools view -b > filtered7.bam && 
+        rm header1.sam
+
+#filtering reads 6 that passed through the whole region of interest (READY FOR MERGING)
+samtools view -H filtered6.bam > header1.sam && 
+    samtools view filtered6.bam | 
+    awk -v start="$start_pos" -v end="$end_pos" '{split($6, arr, "S"); split(arr[2], ar, "M"); if ($4 <= start && ($4 + length($10) - arr[1] - ar[2]) >= end) print}' | 
+    cat header1.sam - | 
+    samtools view -b > filtered8.bam && 
+        rm header1.sam
+
+#merging the correct files into a single one
+samtools merge -o mapping/filtered.bam filtered2.bam filtered3.bam filtered7.bam filtered8.bam && 
     samtools index mapping/filtered.bam
 
 #converting bam to fasta
 samtools fasta mapping/filtered.bam > clustering/filtered.fasta
 
 #removing unnecessary files
-rm filtered1.bam
-rm filtered2.bam
+rm filtered1.bam filtered2.bam filtered3.bam filtered4.bam filtered5.bam filtered6.bam filtered7.bam filtered8.bam
 
 #CLUSTERING
 cd-hit-est -i clustering/filtered.fasta -o clustering/cluster_c96_n10 -T 0 -M 0 -n 10 -c 0.96 -d 0 >> clustering/log_c96_n10.txt
@@ -144,3 +183,9 @@ bwa mem -t 4 "$5" clustering/extracted_c96_n10.fasta > clustering/aln_c96_n10.sa
 samtools view -b clustering/aln_c96_n10.sam > clustering/aln_c96_n10.bam &&
     samtools sort clustering/aln_c96_n10.bam > clustering/aln_c96_n10_sorted.bam &&
         samtools index clustering/aln_c96_n10_sorted.bam
+
+#
+samtools ampliconclip -o region_cut/ampliconclip.bam --hard-clip --both-ends -b region.bed clustering/aln_c96_n10_sorted.bam &&
+    samtools sort region_cut/ampliconclip.bam > region_cut/ampliconclip_sorted.bam &&
+        samtools index region_cut/ampliconclip_sorted.bam
+rm region.bed
