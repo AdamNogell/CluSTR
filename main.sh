@@ -8,7 +8,7 @@
 
 
 #CREATING NEEDED DIRECTORIES, FILES AND VARIABLES
-mkdir split top mapping clustering region_cut
+mkdir split top mapping clustering
 touch report.txt log.txt clustering/log_c96_n10.txt clustering/extracted_c96_n10.fasta region.bed
 rv_primer=$( cut -f 2 "$3" | sed -n '2p')
 adapter_5=$(sed -n '1p' "$4")
@@ -165,14 +165,20 @@ samtools view -H filtered6.bam > header1.sam &&
 samtools merge -o mapping/filtered.bam filtered2.bam filtered3.bam filtered7.bam filtered8.bam && 
     samtools index mapping/filtered.bam
 
-#converting bam to fasta
-samtools fasta mapping/filtered.bam > clustering/filtered.fasta
-
 #removing unnecessary files
 rm filtered1.bam filtered2.bam filtered3.bam filtered4.bam filtered5.bam filtered6.bam filtered7.bam filtered8.bam
 
+#REGION CUT
+#cutting all reads to contain only the region of interest
+samtools ampliconclip -o clustering/region_cut.bam --hard-clip --both-ends -b region.bed mapping/filtered.bam &&
+    samtools sort clustering/region_cut.bam > clustering/region_cut_sorted.bam &&
+rm region.bed
+
+#converting bam to fasta
+samtools fasta clustering/region_cut_sorted.bam > clustering/region_cut_sorted.fasta
+
 #CLUSTERING
-cd-hit-est -i clustering/filtered.fasta -o clustering/cluster_c96_n10 -T 0 -M 0 -n 10 -c 0.96 -d 0 >> clustering/log_c96_n10.txt
+cd-hit-est -i clustering/region_cut_sorted.fasta -o clustering/cluster_c96_n10 -T 0 -M 0 -n 10 -c 0.96 -d 0 >> clustering/log_c96_n10.txt
 mv clustering/cluster_c96_n10 clustering/cluster_c96_n10.fasta
 
 #extracting representative sequences (centroids) from each cluster
@@ -183,9 +189,3 @@ bwa mem -t 4 "$5" clustering/extracted_c96_n10.fasta > clustering/aln_c96_n10.sa
 samtools view -b clustering/aln_c96_n10.sam > clustering/aln_c96_n10.bam &&
     samtools sort clustering/aln_c96_n10.bam > clustering/aln_c96_n10_sorted.bam &&
         samtools index clustering/aln_c96_n10_sorted.bam
-
-#
-samtools ampliconclip -o region_cut/ampliconclip.bam --hard-clip --both-ends -b region.bed clustering/aln_c96_n10_sorted.bam &&
-    samtools sort region_cut/ampliconclip.bam > region_cut/ampliconclip_sorted.bam &&
-        samtools index region_cut/ampliconclip_sorted.bam
-rm region.bed
