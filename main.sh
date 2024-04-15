@@ -98,20 +98,44 @@ samtools view -b -o mapping/RV_region_sorted.bam mapping/RVreads_sorted.bam U133
 
 #FILTERING
 #filtering reads that were clipped from the left side and and pass throught the whole region of interest (FURTHER PROCESSING REQIRED)
-samtools view -H mapping/RVreads_sorted.bam > header1.sam && 
+samtools view -H mapping/RVreads_sorted.bam > header.sam && 
     samtools view mapping/RVreads_sorted.bam | 
     awk -v start="$start_pos" -v end="$end_pos" '{if ($4 <= start && $4 + length($10) >= end && $6 ~ /^[0-9]+S/) {split($6, arr, "S"); if ($4 <= start && ($4 + length($10) - arr[1]) >= end) print}}' | 
-    cat header1.sam - | 
+    cat header.sam - | 
     samtools view -b > filtered1.bam && 
-        rm header1.sam
+        rm header.sam
 
 #filtering reads that were not clipped from the left side (READY FOR MERGING)
-samtools view -H mapping/RVreads_sorted.bam > header2.sam && 
+samtools view -H mapping/RVreads_sorted.bam > header.sam && 
     samtools view mapping/RVreads_sorted.bam | 
     awk -v start="$start_pos" -v end="$end_pos" '{if ($4 <= start && $4 + length($10) >= end && $6 !~ /^[0-9]+S/) print}' | 
-    cat header2.sam - | 
+    cat header.sam - | 
     samtools view -b > filtered2.bam && 
-        rm header2.sam
+        rm header.sam
+
+#filtering reads 2 that were not clipped from the right side (READY FOR MERGING)
+samtools view -H filtered2.bam > header.sam && 
+    samtools view filtered2.bam | 
+    awk '{if ($6 !~ /S$/) print}' | 
+    cat header.sam - | 
+    samtools view -b > filtered2A.bam && 
+        rm header.sam
+
+#filtering reads 2 that were clipped from the right side (FURTHER PROCESSING REQUIRED)
+samtools view -H filtered2.bam > header.sam && 
+    samtools view filtered2.bam | 
+    awk '{if ($6 ~ /S$/) print}' | 
+    cat header.sam - | 
+    samtools view -b > filtered2B.bam && 
+        rm header.sam
+
+#filtering reads 2B that passed through the whole region of interest (READY FOR MERGING)
+samtools view -H filtered2B.bam > header.sam && 
+    samtools view filtered2B.bam | 
+    awk -v start="$start_pos" -v end="$end_pos" '{split($6, arr, "S"); n=split(arr[1], ar, "M"); if ($4 <= start && ($4 + $10 - ar[n] >= end)) print}' | 
+    cat header.sam - | 
+    samtools view -b > filtered2C.bam && 
+        rm header.sam
 
 #filtering reads that were not clipped from the right side (READY FOR MERGING)
 samtools view -H filtered1.bam > header1.sam && 
@@ -162,11 +186,11 @@ samtools view -H filtered6.bam > header1.sam &&
         rm header1.sam
 
 #merging the correct files into a single one
-samtools merge -o mapping/filtered.bam filtered2.bam filtered3.bam filtered7.bam filtered8.bam && 
+samtools merge -h  mapping/RVreads_sorted.bam -o mapping/filtered.bam filtered2A.bam filtered2C.bam filtered3.bam filtered7.bam filtered8.bam && 
     samtools index mapping/filtered.bam
 
 #removing unnecessary files
-rm filtered1.bam filtered2.bam filtered3.bam filtered4.bam filtered5.bam filtered6.bam filtered7.bam filtered8.bam
+rm filtered1.bam filtered2.bam filtered2A.bam filtered2B.bam filtered2C.bam filtered3.bam filtered4.bam filtered5.bam filtered6.bam filtered7.bam filtered8.bam
 
 #REGION CUT
 #cutting all reads to contain only the region of interest
