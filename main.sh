@@ -207,9 +207,3 @@ mv clustering/cluster_c96_n10 clustering/cluster_c96_n10.fasta
 
 #extracting representative sequences (centroids) from each cluster
 ../scripts/cluster_extract.py clustering/cluster_c96_n10.clstr clustering/cluster_c96_n10.fasta clustering/extracted_c96_n10.fasta
-
-#mapping the centroids
-bwa mem -t 4 "$5" clustering/extracted_c96_n10.fasta > clustering/aln_c96_n10.sam
-samtools view -b clustering/aln_c96_n10.sam > clustering/aln_c96_n10.bam &&
-    samtools sort clustering/aln_c96_n10.bam > clustering/aln_c96_n10_sorted.bam &&
-        samtools index clustering/aln_c96_n10_sorted.bam
