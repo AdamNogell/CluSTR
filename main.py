@@ -1,11 +1,7 @@
 #!/usr/bin/env python3
 
-# argv[1] = clustered .clstr file
-# argv[2] = clustered .fasta file
-# argv[3] = output .fasta file
-
 from Bio import SeqIO
-import re, os, subprocess, sys
+import re, sys, subprocess
 
 def parseCigar(C:str): 
     """
@@ -65,9 +61,15 @@ def applyCigar(start_pos:int, cgr:str, sq:str):
 
     return aln_sq
 
+with open(sys.argv[1], 'r') as region:
+    line = region.readlines()
+    lines = [x.strip() for x in line]
+    start_pos = int(lines[2])
+    end_pos = int(lines[3])
+
 # Extract centroid sequence IDs from CD-HIT-EST output file
 centroid_ids = {}
-with open(sys.argv[1], "r") as f:
+with open('clustering/cluster_c96_n10.clstr', "r") as f:
     for line in f:
         if line.startswith(">Cluster"):
             current_cluster_id = line.strip().split()[-1]
@@ -78,30 +80,32 @@ with open(sys.argv[1], "r") as f:
 
 # Extract centroid sequences from input FASTA file
 output_sequences = {}
-with open(sys.argv[2], "r") as fasta_file:
+with open('clustering/cluster_c96_n10.fasta', "r") as fasta_file:
     for record in SeqIO.parse(fasta_file, "fasta"):
         fasta_id = record.id.split()[0]
         if fasta_id in centroid_ids:
             output_sequences[centroid_ids[fasta_id]] = record.seq
 
 # Write extracted sequences to a new FASTA file
-with open(sys.argv[3], "w") as extracted:
+with open('extracted.fasta', "w") as extracted:
     sorted_sequences = sorted(output_sequences.items(), key=lambda x: int(x[0]))
     for cluster_id, seq in sorted_sequences:
         extracted.write(f">{cluster_id}\n{seq}\n")
 
-subprocess.run('bwa mem -t 4 ../../U13369/U13369.1.fasta extracted.fasta > mapped.sam', shell=True)
-subprocess.run('samtools view -b mapped.sam > mapped.bam && samtools sort mapped.bam > sorted.bam && samtools index sorted.bam', shell=True)
+subprocess.run('bwa mem -t 4 ../U13369/U13369.1.fasta extracted.fasta > mapped.sam 2> clustering/clustering_log.txt', shell=True)
+subprocess.run('samtools view -b mapped.sam > mapped.bam && samtools sort mapped.bam > mapping/postclustering_mapped.bam && samtools index mapping/postclustering_mapped.bam', shell=True)
 
-# Input is a .sam file that is parsed according to columns. Then columns 4 (starting position), 6 (CIGAR) and 10 (sequence) are passed down to the applyCigar function that outputs a sequence cut according to the coordinates of the region of interest. 
-# Deletions are replaced in the output with '-' and sequences that have been hard-clipped or soft-clipped are replaced with '*'. The output is .fasta file with the corresponding sequence ID and then the modified sequence in the next line.
+"""
+Input is a .sam file that is parsed according to columns. Then columns 4 (starting position), 6 (CIGAR) and 10 (sequence) are passed down to the applyCigar function that outputs a sequence cut according to the coordinates of the region of interest. 
+Deletions are replaced in the output with '-' and sequences that have been hard-clipped or soft-clipped are replaced with '*'. The output is .fasta file with the corresponding sequence ID and then the modified sequence in the next line.
+"""
 split = []
 with open('mapped.sam', "r") as sam, open('cigar.fasta', "w") as fasta:
     for line in sam:
         if '@' not in line:
             split = line.split()
             parsed = applyCigar(split[3], split[5], split[9])
-            fasta.write(f'>{split[0]}\n{parsed[41837:41882]}\n')
+            fasta.write(f'>{split[0]}\n{parsed[start_pos:end_pos]}\n')
 
 # Find the sequences that doesn't contain '*' in the last .fasta output file and rewrite them into new .fasta file with corresponding sequence ID
 with open('cigar.fasta', 'r') as cigar, open('cut.fasta', 'w') as cut:
@@ -111,11 +115,9 @@ with open('cigar.fasta', 'r') as cigar, open('cut.fasta', 'w') as cut:
             cut.write(lines[i-1])
             cut.write(lines[i])
 
-os.remove('cigar.fasta')
-
 # Read the FASTA file and store the sequences in a dictionary
 sequences = {}
-for record in SeqIO.parse('/Users/adamn./Desktop/NGS/testing/test/cut.fasta', 'fasta'):
+for record in SeqIO.parse('cut.fasta', 'fasta'):
     sequence_id = record.id
     sequence = str(record.seq)
     if sequence not in sequences:
@@ -127,7 +129,7 @@ sequence_values =[[sequence, list(sorted(value))] for sequence, value in sequenc
 
 #Count sequences for each cluster and output them into cluster_count.txt file
 cluster_count = 0
-with open('cluster_test.clstr', "r") as A, open('cluster_count.txt', "w") as B:
+with open('clustering/cluster_c96_n10.clstr', "r") as A, open('cluster_count.txt', "w") as B:
     for line in A:
         if line.startswith(">Cluster"):
             line = line.split()
@@ -144,7 +146,7 @@ with open('cluster_test.clstr', "r") as A, open('cluster_count.txt', "w") as B:
         B.write(f"{cluster_count}")
 
 #Combine cluster_count and sequence_values into a single output that tells how many unique sequences occur in the original file
-with open('cluster_count.txt', 'r') as A, open('seq_count.txt', 'w') as B:
+with open('cluster_count.txt', 'r') as A, open('final_temp.txt', 'w') as B:
     Alines = A.readlines()
     for cluster in sequence_values:
         temp = 0
@@ -159,4 +161,4 @@ with open('cluster_count.txt', 'r') as A, open('seq_count.txt', 'w') as B:
         b = str(final[1])
         B.write(f"{a}\t{b}\n")
 
-subprocess.run('sort -k2nr seq_count.txt | awk \'{if ($2 >= 1000) print}\' > filtered_file.txt', shell=True)
+print("Python script successfully executed - said Python")
