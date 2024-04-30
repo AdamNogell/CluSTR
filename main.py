@@ -67,6 +67,9 @@ with open(sys.argv[1], 'r') as region:
     start_pos = int(lines[2])
     end_pos = int(lines[3])
 
+for record in SeqIO.parse('../U13369/U13369.1.fasta', 'fasta'):
+    ref_seq = str(record.seq[start_pos:end_pos])
+
 # Extract centroid sequence IDs from CD-HIT-EST output file
 centroid_ids = {}
 with open('clustering/cluster_c96_n10.clstr', "r") as f:
@@ -161,4 +164,12 @@ with open('cluster_count.txt', 'r') as A, open('final_temp.txt', 'w') as B:
         b = str(final[1])
         B.write(f"{a}\t{b}\n")
 
-print("Python script successfully executed - said Python")
+subprocess.run('sort -k2nr final_temp.txt | awk \'{if ($2 >= 1000) print}\' > final_temp2.txt', shell=True)
+
+with open('final_temp2.txt', 'r') as temp, open('final.txt', 'w') as final:
+    final.write(f"{ref_seq}\tREFERENCE\n")
+    for line in temp:
+        final.write(line)
+
+
+print("Python script successfully executed - said Python (8/8)")

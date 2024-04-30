@@ -28,7 +28,7 @@ echo -n "input file 2: " >> report.txt &&
     wc -l input2.fastq | 
     awk '{print int($1/4)}' >> report.txt
 
-echo "Unzipping completed"
+echo "Unzipping completed (1/8)"
 
 #ADAPTER TRIMMING
 cutadapt -a "$adapter_3" -A "$adapter_5" -m 60 -q 18 -j 4 -o split/file_1_trimmed.fastq -p split/file_2_trimmed.fastq input1.fastq input2.fastq >> log.txt
@@ -39,7 +39,7 @@ echo -n "file 2 after adapter cutting: " >> report.txt &&
     wc -l split/file_2_trimmed.fastq | 
     awk '{print int($1/4)}' >> report.txt
 
-echo "Adapter trimming completed"
+echo "Adapter trimming completed (2/8)"
 
 #SPLITTING FW AND RV READS
 ../fastx_barcode_splitter.pl --bcfile "$3" --bol --prefix split/file_1_trimmed- --suffix .fastq --mismatches 5 --partial 5 < split/file_1_trimmed.fastq >> log.txt
@@ -67,7 +67,7 @@ echo -n "RV reads total: " >> report.txt &&
     wc -l split/RVreads.fastq | 
     awk '{print int($1/4)}' >> report.txt
 
-echo "Split completed"
+echo "Split completed (3/8)"
 
 #removing unnecessary files
 rm input*.fastq split/file_1_trimmed-*.fastq split/file_2_trimmed-*.fastq
@@ -82,7 +82,7 @@ echo -n "RV reads after primer cut: " >> report.txt &&
     wc -l RVreads_primerless.fastq | 
     awk '{print int($1/4)}' >> report.txt
 
-echo "Primer cutting completed"
+echo "Primer cutting completed (4/8)"
 
 #MAPPING
 bwa index "$5" 2> log.txt
@@ -90,7 +90,7 @@ bwa mem -t 4 "$5" RVreads_primerless.fastq > mapping/RVreads.sam 2> log.txt
 samtools view -b mapping/RVreads.sam > mapping/RVreads.bam && 
     samtools sort mapping/RVreads.bam -o mapping/RVreads_sorted.bam 
 
-echo "Mapping completed"
+echo "Mapping completed (5/8)"
 
 #FILTERING
 #filtering reads that were clipped from the left side and and pass throught the whole region of interest (FURTHER PROCESSING REQIRED)
@@ -188,24 +188,22 @@ samtools merge -h  mapping/RVreads_sorted.bam -o mapping/preclustering_mapped.ba
 #converting bam to fasta
 samtools fasta mapping/preclustering_mapped.bam > filtered.fasta
 
-echo "Filtering completed"
+echo "Filtering completed (6/8)"
 
 #CLUSTERING
 cd-hit-est -i filtered.fasta -o clustering/cluster_c96_n10 -T 0 -M 0 -n 10 -c 0.96 -d 0 >> clustering/clustering_log.txt
 mv clustering/cluster_c96_n10 clustering/cluster_c96_n10.fasta
 
-echo "Clustering completed"
+echo "Clustering completed (7/8)"
 
 #extracting representative sequences (centroids) from each cluster, then cutting the reads to desired region, then filtering frequently occuring sequences
 ../scripts/main.py "$4"
-sort -k2nr final_temp.txt | 
-awk '{if ($2 >= 1000) print}' > final.txt
 
-echo "Python script successfully executed - said Bash"
+echo "Python script successfully executed - said Bash (8/8)"
 
 #removing unnecessary files
 rm filtered1.bam filtered2.bam filtered2A.bam filtered2B.bam filtered2C.bam filtered3.bam filtered4.bam filtered5.bam filtered6.bam filtered7.bam filtered8.bam
-rm cigar.fasta cluster_count.txt cut.fasta extracted.fasta mapped* final_temp.txt filtered.fasta RVreads_primerless.fastq
+rm cigar.fasta cluster_count.txt cut.fasta extracted.fasta mapped* final_temp* filtered.fasta RVreads_primerless.fastq
 rm mapping/RV*
 
 echo "hotovo:)"
