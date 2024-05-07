@@ -156,7 +156,7 @@ with open('cluster_count.txt', 'r') as A, open('final_temp.txt', 'w') as B:
         for x in cluster[1]: 
             for line in Alines:
                 linespl = line.split()
-                if x in linespl[0]:
+                if x == linespl[0]:
                     temp += int(linespl[1])
         cluster[1] = temp
     for final in sequence_values:
