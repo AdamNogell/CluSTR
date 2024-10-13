@@ -42,14 +42,14 @@ echo -n "file 2 after adapter cutting: " >> report.txt &&
 echo "Adapter trimming completed (2/8)"
 
 #SPLITTING FW AND RV READS
-../fastx_barcode_splitter.pl --bcfile "$3" --bol --prefix split/file_1_trimmed- --suffix .fastq --mismatches 5 --partial 5 < split/file_1_trimmed.fastq >> log.txt
+fastx_barcode_splitter.pl --bcfile "$3" --bol --prefix split/file_1_trimmed- --suffix .fastq --mismatches 5 --partial 5 < split/file_1_trimmed.fastq >> log.txt
 echo -n "file 1 FW reads: " >> report.txt && 
     wc -l split/file_1_trimmed-FW.fastq | 
     awk '{print int($1/4)}' >> report.txt
 echo -n "file 1 RV reads: " >> report.txt && 
     wc -l split/file_1_trimmed-RV.fastq | 
     awk '{print int($1/4)}' >> report.txt
-../fastx_barcode_splitter.pl --bcfile "$3" --bol --prefix split/file_2_trimmed- --suffix .fastq --mismatches 5 --partial 5 < split/file_2_trimmed.fastq >> log.txt
+fastx_barcode_splitter.pl --bcfile "$3" --bol --prefix split/file_2_trimmed- --suffix .fastq --mismatches 5 --partial 5 < split/file_2_trimmed.fastq >> log.txt
 echo -n "file 2 FW reads: " >> report.txt && 
     wc -l split/file_2_trimmed-FW.fastq | 
     awk '{print int($1/4)}' >> report.txt
