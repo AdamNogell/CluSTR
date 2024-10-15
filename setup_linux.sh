@@ -10,7 +10,7 @@ sudo apt install -y build-essential wget curl
 
 # Install Cutadapt
 echo "Installing Cutadapt..."
-sudo apt install cutadapt
+pip install cutadapt
 
 # Install FastX Toolkit
 echo "Installing FastX Toolkit..."
